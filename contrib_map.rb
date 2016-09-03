@@ -8,7 +8,6 @@
 class ContribMap
 
   require 'net/http'
-  # require 'uri'
 
   DEFAULT_OPTIONS = {
                       github_url:     'https://github.com/',
@@ -59,9 +58,13 @@ class ContribMap
     if present?(@copy_user)
       their_contributions_calendar = get_contributions_calendar(@copy_user)
       their_max_daily_commits = their_contributions_calendar.max
-      puts "Their maximum number of daily commits is: #{their_max_daily_commits}"
+      puts "The maximum number of daily commits of #{@copy_user} is: #{their_max_daily_commits}"
+      puts "We will try to match #{@copy_user}'s repository map"
       # Calendar for values 0..4:
       their_contributions_calendar = normalize_calendar(their_contributions_calendar)
+
+      start_date = calendar_start_date
+
     else
       puts 'No user to copy. Bothing to do!'
     end
@@ -82,6 +85,19 @@ class ContribMap
   def all_string_with_values?(*array_of_strings)
     return false unless array_of_strings.is_a? Array
     array_of_strings == array_of_strings.select{|s| present?(s)}
+  end
+
+  # Time (date-time) for the first Sunday after one year ago today at 12:00pm (noon), at the user's Time Zone
+  def calendar_start_date
+    right_now = Time.now
+    one_year_ago = Time.new(right_now.year - 1, right_now.month, right_now.day, 12, 0, 0, right_now.zone)
+    unless one_year_ago.sunday?
+      day_in_seconds = 24*60*60
+      # Weekdays numbering in Ruby: Sunday #=> 0, Saturday #=> 6. So I need to get to the 7th day (zero again)
+      weekday_delta = 7 - one_year_ago.wday
+      one_year_ago = one_year_ago + day_in_seconds * weekday_delta
+    end
+    one_year_ago
   end
 
   # --Specialized Stuff related to the task at hand:
