@@ -65,6 +65,13 @@ class ContribMap
 
       start_date = calendar_start_date
 
+      git_url = 'git@github.com'
+
+      shell_script = contribution_shell_script(their_contributions_calendar, calendar_start_date, @username, @repo_to_change, git_url, faking_multiplier, 0)
+      puts 'Script:'
+      puts '*********'
+      puts shell_script
+      puts '*********'
     else
       puts 'No user to copy. Bothing to do!'
     end
@@ -98,6 +105,15 @@ class ContribMap
       one_year_ago = one_year_ago + day_in_seconds * weekday_delta
     end
     one_year_ago
+  end
+
+  # Multiplies 2D matrix by an escalar value
+  def map_multiply(matrix, escalar_multiplier = 1)
+    matrix.collect do |row|
+      row.collect do |num|
+        num * escalar_multiplier
+      end
+    end
   end
 
   # --Specialized Stuff related to the task at hand:
@@ -153,6 +169,44 @@ class ContribMap
 
   def calendar_max_value(calendar)
     calendar.flatten.max
+  end
+
+  # Next date, given a Time object
+  def next_date(datetime_obj, offset_in_weeks = 0)
+    day_in_seconds = 24*60*60
+    datetime_obj + (offset_in_weeks * 7 * day_in_seconds)
+  end
+
+  def commit_command(commit_date)
+    iso_date = commit_date.strftime '%FT%T'
+    "GIT_AUTHOR_DATE=#{iso_date} GIT_COMMITTER_DATE=#{iso_date} "\
+    "git commit --allow-empty -m \"contrib_map\" > /dev/null\n"
+  end
+
+  def contribution_shell_script(image_map, start_date, username, repo, git_url, multiplier = 1, weeks_offset = 0)
+    commit_lines = []
+    # next_date = start_date
+    # image_map.each do |row|
+    #   row.each do |value|
+    #     (0..value*multiplier).each do
+    #       commit_lines << commit_command(next_date)
+    #       next_date = next_date(start_date, weeks_offset)
+    #     end
+    #   end
+    # end
+
+    "#!/bin/bash\n"\
+    "REPO=#{repo}\n"\
+    "git init $REPO\n"\
+    "cd $REPO\n"\
+    "touch README.md\n"\
+    "git add README.md\n"\
+    "touch contrib_map\n"\
+    "git add contrib_map\n"\
+    "#{commit_lines.join}\n"\
+    "git remote add origin #{git_url}:#{username}/$REPO.git\n"\
+    "git pull\n"\
+    "git push -u origin master\n"
   end
 
 end
