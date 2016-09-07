@@ -51,13 +51,13 @@ class ContribMap
     end
 
     my_contributions_calendar = get_contributions_calendar(@username)
-    my_max_daily_commits = my_contributions_calendar.max
+    my_max_daily_commits = calendar_max_value my_contributions_calendar
     puts "Your maximum number of daily commits is: #{my_max_daily_commits}"
     faking_multiplier = scaling_multiplier(my_max_daily_commits)
 
     if present?(@copy_user)
       their_contributions_calendar = get_contributions_calendar(@copy_user)
-      their_max_daily_commits = their_contributions_calendar.max
+      their_max_daily_commits = calendar_max_value their_contributions_calendar
       puts "The maximum number of daily commits of #{@copy_user} is: #{their_max_daily_commits}"
       puts "We will try to match #{@copy_user}'s repository map"
       # Calendar for values 0..4:
@@ -90,7 +90,7 @@ class ContribMap
   # Time (date-time) for the first Sunday after one year ago today at 12:00pm (noon), at the user's Time Zone
   def calendar_start_date
     right_now = Time.now
-    one_year_ago = Time.new(right_now.year - 1, right_now.month, right_now.day, 12, 0, 0, right_now.zone)
+    one_year_ago = Time.new(right_now.year - 1, right_now.month, right_now.day, 12, 0, 0, right_now.utc_offset)
     unless one_year_ago.sunday?
       day_in_seconds = 24*60*60
       # Weekdays numbering in Ruby: Sunday #=> 0, Saturday #=> 6. So I need to get to the 7th day (zero again)
@@ -133,9 +133,13 @@ class ContribMap
 
   # Sets the contribution calendar to use only numbers 0..4
   def normalize_calendar(contributions_calendar)
-    max_value = contributions_calendar.max.to_f
-    scaling_value = scaling_multiplier(max_value).to_f
+    max_value = calendar_max_value(contributions_calendar)
+    scaling_value = scaling_multiplier(max_value.to_f).to_f
     contributions_calendar.collect{|n| (n/scaling_value).ceil.to_i}
+  end
+
+  def calendar_max_value(calendar)
+    calendar.flatten.max
   end
 
 end
