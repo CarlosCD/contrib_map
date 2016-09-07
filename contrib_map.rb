@@ -115,15 +115,24 @@ class ContribMap
     page.encode('utf-8')
   end
 
-  # Yield and Array of daily counts from the GitHub contributions SVG
+  # Yields a 2D matrix Array of daily counts from the GitHub contributions SVG
+  #  Each column is one week
   def get_contributions_calendar(user_name)
     calendar_svg = get_contributions_svg(user_name)
-    calendar_svg.scan(/<rect ([^>\n]+)>\n/).flatten.collect do |rect_line|
-      # puts "line: [#{rect_line}]"
-      # puts
+    rect_lines = calendar_svg.scan(/<rect ([^>\n]+)>\n/).flatten
+    calendar_by_weekdays = [[]] * 7
+    next_value_in = 0
+    rect_lines.each do |rect_line|
       num_commits = rect_line.partition('data-count="')[2].partition('"')[0]
-      num_commits.empty? ? nil : num_commits.to_i
-    end.compact
+      unless num_commits.empty?
+        calendar_by_weekdays[next_value_in] += [num_commits.to_i]
+        next_value_in = (next_value_in + 1).modulo(7)
+      end
+    end
+    # puts calendar_by_weekdays.size.to_s
+    # calendar_by_weekdays.each_with_index {|r,i| puts "Row #{i}: size: #{r.size}"}
+    # puts calendar_by_weekdays.to_s
+    calendar_by_weekdays
   end
 
   # Multiplier to scale GitHub colors to a commit history
@@ -135,7 +144,11 @@ class ContribMap
   def normalize_calendar(contributions_calendar)
     max_value = calendar_max_value(contributions_calendar)
     scaling_value = scaling_multiplier(max_value.to_f).to_f
-    contributions_calendar.collect{|n| (n/scaling_value).ceil.to_i}
+    contributions_calendar.collect do |row|
+      row.collect do |n|
+        (n/scaling_value).ceil.to_i
+      end
+    end
   end
 
   def calendar_max_value(calendar)
