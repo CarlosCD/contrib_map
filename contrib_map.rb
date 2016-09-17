@@ -9,78 +9,114 @@ class ContribMap
 
   require 'net/http'
 
-  DEFAULT_OPTIONS = {
-                      github_url:     'https://github.com/',
-                      repo_to_change: 'contrib_mapper'
-                    }
-  OPTIONS_AND_QUESTIONS = {
-                            github_url:     "Enter GitHub URL#{" (leave blank to use #{DEFAULT_OPTIONS[:github_url]})" if DEFAULT_OPTIONS[:github_url]}",
-                            username:       'Your GitHub user name',
-                            repo_to_change: "Repository to be used to send changes#{" (leave blank to use #{DEFAULT_OPTIONS[:repo_to_change]})" if DEFAULT_OPTIONS[:repo_to_change]}",
-                            copy_user:      'Use the shape of the map of this user'
-                          }
-
-  # Takes a Hash of options, just to avoid the annoying questioning to set it up for the same values every time.
+  # It takes a Hash of options, just to avoid the annoying questioning to set it up for the same values every time.
   #  Change the default options if you wish
-  #  Example:
-  def perform(options = { github_url: 'https://github.com/', username: 'carloscd', repo_to_change: 'contrib_mapper', copy_user: 'tenderlove' })
-  # def perform(options = {})
-    # Set the options:
-    ContribMap::OPTIONS_AND_QUESTIONS.each do |data_to_collect, message|
-      # puts "#{data_to_collect}: '#{message}'"
-      if options[data_to_collect]
-        instance_variable_set "@#{data_to_collect}".to_sym, options[data_to_collect]
-      else
-        puts message + ': '
-        entered_value = gets.chomp
-        instance_variable_set "@#{data_to_collect}".to_sym, (entered_value.empty? ? DEFAULT_OPTIONS[data_to_collect] : entered_value)
-      end
-    end
-    puts 'Got: '
-    ContribMap::OPTIONS_AND_QUESTIONS.keys.each do |data_collected|
-      puts " - #{snakecase_prettifier data_collected}: [#{instance_variable_get "@#{data_collected}".to_sym}]"
-    end
-    # puts '---'
-    # instance_variables.each do |data_collected|
-    #   puts " #{data_collected}: [#{instance_variable_get data_collected}]"
-    # end
-    # Required data:
-    unless all_string_with_values?(@github_url, @username, @repo_to_change)
-      puts 'Missing information. Either the GitHub URL, the username, or ythe repo to change are missing'
-      return
-    end
+  def initialize(received_options = {})
+    required_data = [:github_url, :username, :repo_to_change]
+    defaults = {
+                  github_url:     'https://github.com/',
+                  repo_to_change: 'contrib_mapper',
+                  username:       'carloscd',
+                }
+    questions = {
+                  github_url:     "Enter GitHub URL#{" (leave blank to use #{defaults[:github_url]})" if defaults[:github_url]}",
+                  repo_to_change: "Repository to be used to send changes#{" (leave blank to use #{defaults[:repo_to_change]})" if defaults[:repo_to_change]}",
+                  username:       'Your GitHub user name'
+                }
+    required = defaults.keys
+    set_data(true, required_data, defaults, questions, [], received_options)
 
     my_contributions_calendar = get_contributions_calendar(@username)
+    puts 'my_contributions_calendar:'
+    # puts '*********'
+    puts my_contributions_calendar.to_s
+    # puts '*********'
     my_max_daily_commits = calendar_max_value my_contributions_calendar
-    puts "Your maximum number of daily commits is: #{my_max_daily_commits}"
-    faking_multiplier = scaling_multiplier(my_max_daily_commits)
+    puts " Your maximum number of daily commits is: #{my_max_daily_commits}"
+    @faking_multiplier = scaling_multiplier(my_max_daily_commits)
+    puts " The faking multiplier is: '#{@faking_multiplier}'"
+  end
 
-    if present?(@copy_user)
-      their_contributions_calendar = get_contributions_calendar(@copy_user)
-      their_max_daily_commits = calendar_max_value their_contributions_calendar
-      puts "The maximum number of daily commits of #{@copy_user} is: #{their_max_daily_commits}"
-      puts "We will try to match #{@copy_user}'s repository map"
-      # Calendar for values 0..4:
-      their_contributions_calendar = normalize_calendar(their_contributions_calendar)
+  def random_map(received_options = {})
+    defaults = { output_file: 'random.sh', map_file: 'random.txt' }
+    questions = {
+                  output_file: 'The output shell script',
+                  map_file:    'Map tet file to be generated'
+                }
+    set_data(true, defaults.keys, defaults, questions, [], received_options)
+    # Here I should have the instance variables:
+    #  @github_url, @repo_to_change, @username
+    #  @output_file, @map_file
+    save_contribution_map random_contribution_map, @map_file
+    # Pending to generate the script.
+  end
 
-      start_date = calendar_start_date
-
-      git_url = 'git@github.com'
-
-      shell_script = contribution_shell_script(their_contributions_calendar, calendar_start_date, @username, @repo_to_change, git_url, faking_multiplier, 0)
-      puts 'Script:'
-      puts '*********'
-      puts shell_script
-      puts '*********'
-    else
-      puts 'No user to copy. Bothing to do!'
-    end
+  def copy_user(received_options = {})
+    defaults = { user_to_copy: 'tenderlove', output_file: 'tenderlove.sh' }
+    questions = {
+                  copy_user:   'Use the shape of the map of this user',
+                  output_file: 'The output shell script'
+                }
+    optionals = [ :map_file ]
+    set_data(true, defaults.keys, defaults, questions, optionals, received_options)
+    # Here I should have the instance variables:
+    #  @github_url, @repo_to_change, @username
+    #  @user_to_copy, @output_file
+    #  And optional: @map_file
   end
 
   private
 
   # --General utility methods:
-  
+
+  # Generates instance variables, and if needed, asks for user's input:
+  def set_data(verbose = false, required = [], defaults = {}, questions = {}, optionals = [], received = {})
+    # Set the options:
+    keys_to_set = required
+    optionals.each do |opt|
+      if received[opt]
+        keys_to_set << opt
+      end
+    end
+    # puts '-------'
+    # puts 'Received info:'
+    # puts "  verbose:   #{verbose}"
+    # puts "  required:  #{required}"
+    # puts "  defaults:  #{defaults}"
+    # puts "  questions: #{questions}"
+    # puts "  optionals: #{optionals}"
+    # puts "  received:  #{received}"
+    # puts '--'
+    # puts "keys_to_set: #{keys_to_set}"
+    # puts '--'
+    all_data = {}
+    keys_to_set.each do |key|
+      all_data[key] = received[key] || defaults[key]
+    end
+    # puts "To set (from received + defaults): #{all_data}"
+    # puts '-------'
+    # puts '--'
+    keys_to_set.each do |key|
+      if all_data[key]
+        given_value = all_data[key]
+      else
+        puts "#{questions[key] || key.to_s}: "
+        given_value = gets.chomp
+      end
+      instance_variable_set "@#{key}".to_sym, (given_value.empty? ? nil : given_value)
+    end
+    if verbose
+      # puts 'Setup: '
+      puts
+      keys_to_set.each do |data_collected|
+        puts " - #{snakecase_prettifier data_collected}: '#{instance_variable_get "@#{data_collected}".to_sym}'"
+      end
+      unless all_string_with_values?(@github_url, @username, @repo_to_change)
+        puts 'Important informstion missing: either the GitHub URL, the username, or the repo to change.'
+      end
+    end
+  end
+
   def snakecase_prettifier(sneakey)
     sneakey.to_s.capitalize.gsub('_', ' ')
   end
@@ -94,24 +130,13 @@ class ContribMap
     array_of_strings == array_of_strings.select{|s| present?(s)}
   end
 
-  # Time (date-time) for the first Sunday after one year ago today at 12:00pm (noon), at the user's Time Zone
-  def calendar_start_date
-    right_now = Time.now
-    one_year_ago = Time.new(right_now.year - 1, right_now.month, right_now.day, 12, 0, 0, right_now.utc_offset)
-    unless one_year_ago.sunday?
-      day_in_seconds = 24*60*60
-      # Weekdays numbering in Ruby: Sunday #=> 0, Saturday #=> 6. So I need to get to the 7th day (zero again)
-      weekday_delta = 7 - one_year_ago.wday
-      one_year_ago = one_year_ago + day_in_seconds * weekday_delta
-    end
-    one_year_ago
-  end
-
-  # Multiplies 2D matrix by an escalar value
-  def map_multiply(matrix, escalar_multiplier = 1)
-    matrix.collect do |row|
-      row.collect do |num|
-        num * escalar_multiplier
+  def save_contribution_map (matrix, file_name = 'random.txt', name = 'random_example')
+    File.open(file_name, 'w') do |f|
+      f.puts ":#{name}"
+      # f.puts matrix.to_s.gsub(' ', '')
+      f.print '['
+      matrix.each_with_index do |row, index|
+        f.puts row.to_s.gsub(' ', '') + (index == 6 ? ']' : ',')
       end
     end
   end
@@ -147,8 +172,14 @@ class ContribMap
     end
     # puts calendar_by_weekdays.size.to_s
     # calendar_by_weekdays.each_with_index {|r,i| puts "Row #{i}: size: #{r.size}"}
+    # puts "--Result of get_contributions_calendar(#{user_name}):"
     # puts calendar_by_weekdays.to_s
+    # puts '----'
     calendar_by_weekdays
+  end
+
+  def calendar_max_value(calendar)
+    calendar.flatten.max
   end
 
   # Multiplier to scale GitHub colors to a commit history
@@ -156,59 +187,48 @@ class ContribMap
     max_commits == 0 ? 1 : (max_commits / 4.0).ceil.to_i
   end
 
-  # Sets the contribution calendar to use only numbers 0..4
-  def normalize_calendar(contributions_calendar)
-    max_value = calendar_max_value(contributions_calendar)
-    scaling_value = scaling_multiplier(max_value.to_f).to_f
-    contributions_calendar.collect do |row|
-      row.collect do |n|
-        (n/scaling_value).ceil.to_i
+  def random_contribution_map (weights = { 0 => 5, 1 => 4, 2 => 3, 3 => 2, 4 => 1 }, weeks = 53)
+    file_name = 'test.txt'
+    name = 'random_example'
+    weighted_array = weights.collect{ |value, weight| [value]*weight }.flatten
+    # Like for example: [0,0,0,0,0,1,1,1,1,2,2,2,3,3,4]
+    # puts "Weighted array used: #{weighted_array}"
+    random_matrix = []
+    (1..7).to_a.each do |week_day|
+      random_row = []
+      (1..weeks).to_a.each do |week_number|
+        random_row << weighted_array.sample
       end
+      random_matrix << random_row
     end
-  end
-
-  def calendar_max_value(calendar)
-    calendar.flatten.max
-  end
-
-  # Next date, given a Time object
-  def next_date(datetime_obj, offset_in_weeks = 0)
-    day_in_seconds = 24*60*60
-    datetime_obj + (offset_in_weeks * 7 * day_in_seconds)
-  end
-
-  def commit_command(commit_date)
-    iso_date = commit_date.strftime '%FT%T'
-    "GIT_AUTHOR_DATE=#{iso_date} GIT_COMMITTER_DATE=#{iso_date} "\
-    "git commit --allow-empty -m \"contrib_map\" > /dev/null\n"
-  end
-
-  def contribution_shell_script(image_map, start_date, username, repo, git_url, multiplier = 1, weeks_offset = 0)
-    commit_lines = []
-    # next_date = start_date
-    # image_map.each do |row|
-    #   row.each do |value|
-    #     (0..value*multiplier).each do
-    #       commit_lines << commit_command(next_date)
-    #       next_date = next_date(start_date, weeks_offset)
-    #     end
-    #   end
-    # end
-
-    "#!/bin/bash\n"\
-    "REPO=#{repo}\n"\
-    "git init $REPO\n"\
-    "cd $REPO\n"\
-    "touch README.md\n"\
-    "git add README.md\n"\
-    "touch contrib_map\n"\
-    "git add contrib_map\n"\
-    "#{commit_lines.join}\n"\
-    "git remote add origin #{git_url}:#{username}/$REPO.git\n"\
-    "git pull\n"\
-    "git push -u origin master\n"
+    # puts '*RANDOM MATRIX:********'
+    # puts random_matrix.to_s
+    # puts '*********'
+    random_matrix
   end
 
 end
 
-ContribMap.new.perform
+
+# Possible modes:
+#
+#  All of them will output a shell scripts (.sh), and some an optional output_map (text file).
+#
+#   1. random_map output_script output_map
+#      [ WORK IN PROGRESS ]
+#      Create a random map.
+#   2. copy_user user_name output_script output_map_file
+#      [ WORK IN PROGRESS ]
+#      Mime existing user'map
+#      And create the script + map matrix
+#   3. existing_map map_file output_script
+#      [ NOT IMPLEMENTED YET ]
+#      Use predefined existing map(s)
+#
+
+contrib_mapper = ContribMap.new(username: 'carloscd', repo_to_change: 'contrib_mapper')
+
+contrib_mapper.random_map output_file: 'random.sh', map_file: 'random.txt'
+
+# contrib_mapper.copy_user user_to_copy: 'tenderlove', output_file: 'tenderlove.sh', map_file: 'tenderlove.txt'
+# contrib_mapper.existing_map map_file: 'hello.txt', output_file: 'hello.sh'

@@ -1,5 +1,6 @@
 .DS_Store
-change_map.sh
-contrib_mapper
+*.sh
+contrib_mapper/
+random.txt
 test.txt
-test_repo
+test_repo/
