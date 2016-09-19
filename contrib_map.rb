@@ -27,9 +27,9 @@ class ContribMap
     set_data(true, required_data, defaults, questions, [], received_options)
 
     my_contributions_calendar = get_contributions_calendar(@username)
-    puts 'my_contributions_calendar:'
+    # puts 'my_contributions_calendar:'
     # puts '*********'
-    puts my_contributions_calendar.to_s
+    # puts my_contributions_calendar.to_s
     # puts '*********'
     my_max_daily_commits = calendar_max_value my_contributions_calendar
     puts " Your maximum number of daily commits is: #{my_max_daily_commits}"
@@ -47,8 +47,35 @@ class ContribMap
     # Here I should have the instance variables:
     #  @github_url, @repo_to_change, @username
     #  @output_file, @map_file
-    save_contribution_map random_contribution_map, @map_file
-    # Pending to generate the script.
+
+    random_map = random_contribution_map
+    # puts 'random_contribution_map:'
+    # puts '*********'
+    # puts format_matrix_to_output(random_map)
+    # puts '*********'
+    
+    save_contribution_map random_map, @map_file
+    # Pending to generate the script:
+    # Script contributions: the random_contribution_map times the faking multiplier (@faking_multiplier)
+    random_map = map_multiply(random_map, @faking_multiplier)
+    # puts "random_contribution_map times @faking_multiplier(#{@faking_multiplier}):"
+    # puts '*********'
+    # puts format_matrix_to_output(random_map)
+    # puts '*********'
+
+    start_date = calendar_start_date
+    puts "start_date: [#{start_date}]"
+    shell_script = contribution_shell_script(random_map, start_date, @username, @repo_to_change, 'git@github.com')
+
+    # puts '------'
+    # puts 'Script:'
+    # puts '*********'
+    # puts shell_script
+    # puts '*********'
+
+    open(@output_file, 'w'){ |f| f << shell_script }
+    puts "#{@output_file} saved."
+    puts "Create a new repo #{@github_url}#{@repo_to_change} and run the script"
   end
 
   def copy_user(received_options = {})
@@ -130,15 +157,46 @@ class ContribMap
     array_of_strings == array_of_strings.select{|s| present?(s)}
   end
 
+  def format_matrix_to_output(matrix)
+    result = '['
+    matrix.each_with_index do |row, index|
+      result << (row.to_s.gsub(' ', '') + (index == 6 ? ']' : ',') + "\n") 
+    end
+    result
+  end
+
   def save_contribution_map (matrix, file_name = 'random.txt', name = 'random_example')
     File.open(file_name, 'w') do |f|
       f.puts ":#{name}"
       # f.puts matrix.to_s.gsub(' ', '')
-      f.print '['
-      matrix.each_with_index do |row, index|
-        f.puts row.to_s.gsub(' ', '') + (index == 6 ? ']' : ',')
+      # f.print '['
+      # matrix.each_with_index do |row, index|
+      #   f.puts row.to_s.gsub(' ', '') + (index == 6 ? ']' : ',')
+      # end
+      f.print format_matrix_to_output matrix
+    end
+  end
+
+  # Multiplies 2D matrix by an escalar value
+  def map_multiply(matrix, escalar_multiplier = 1)
+    matrix.collect do |row|
+      row.collect do |num|
+        num * escalar_multiplier
       end
     end
+  end
+
+  # Time (date-time) for the first Sunday after one year ago today at 12:00pm (noon), at the user's Time Zone
+  def calendar_start_date
+    right_now = Time.now
+    one_year_ago = Time.new(right_now.year - 1, right_now.month, right_now.day, 12, 0, 0, right_now.utc_offset)
+    unless one_year_ago.sunday?
+      day_in_seconds = 24*60*60
+      # Weekdays numbering in Ruby: Sunday #=> 0, Saturday #=> 6. So I need to get to the 7th day (zero again)
+      weekday_delta = 7 - one_year_ago.wday
+      one_year_ago = one_year_ago + day_in_seconds * weekday_delta
+    end
+    one_year_ago
   end
 
   # --Specialized Stuff related to the task at hand:
@@ -205,6 +263,62 @@ class ContribMap
     # puts random_matrix.to_s
     # puts '*********'
     random_matrix
+  end
+
+  # Next date, given a Time object
+  def day_next_week(datetime_obj)
+    day_in_seconds = 24*60*60
+    week_in_seconds = 7*day_in_seconds
+    datetime_obj + week_in_seconds
+  end
+
+  def commit_command(commit_date)
+    iso_date = commit_date.strftime '%FT%T'
+    "GIT_AUTHOR_DATE=#{iso_date} GIT_COMMITTER_DATE=#{iso_date} "\
+    "git commit --allow-empty -m \"contrib_map\" > /dev/null\n"
+  end
+
+  def contribution_shell_script(image_map, start_date, username, repo, git_url)
+    # puts '1. image_map matrix:'
+    # puts '********'
+    # puts format_matrix_to_output(image_map)
+    # puts '********'
+
+    commit_lines = []
+    # puts '***Dates*****'
+    # puts "Start date: #{start_date}"
+    image_map.each do |weekday_row|
+      commit_date = start_date
+      weekday_row.each do |value|
+        # puts "Value, commit_date: [#{value}, #{commit_date}]"
+        if value > 0
+          commit_line = commit_command(commit_date)
+          (1..value).to_a.each do |num|
+            commit_lines << commit_line
+          end
+          # puts 'Commits added!'
+        end
+        commit_date = day_next_week(commit_date)
+        # puts "Next commit_date: [#{commit_date}]"
+      end
+    end
+    # puts '********'
+
+    # Returned value (shell script):
+
+    "#!/bin/bash\n"\
+    "\n"\
+    "REPO=#{repo}\n"\
+    "git init $REPO\n"\
+    "cd $REPO\n"\
+    "touch README.md\n"\
+    "git add README.md\n"\
+    "touch contrib_map\n"\
+    "git add contrib_map\n"\
+    "#{commit_lines.join}\n"\
+    "git remote add origin #{git_url}:#{username}/$REPO.git\n"\
+    "git pull\n"\
+    "git push -u origin master\n"
   end
 
 end
