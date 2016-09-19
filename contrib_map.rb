@@ -58,10 +58,10 @@ class ContribMap
     # Pending to generate the script:
     # Script contributions: the random_contribution_map times the faking multiplier (@faking_multiplier)
     random_map = map_multiply(random_map, @faking_multiplier)
-    # puts "random_contribution_map times @faking_multiplier(#{@faking_multiplier}):"
-    # puts '*********'
-    # puts format_matrix_to_output(random_map)
-    # puts '*********'
+    puts "random_contribution_map times @faking_multiplier(#{@faking_multiplier}):"
+    puts '*********'
+    puts format_matrix_to_output(random_map)
+    puts '*********'
 
     start_date = calendar_start_date
     puts "start_date: [#{start_date}]"
@@ -266,10 +266,9 @@ class ContribMap
   end
 
   # Next date, given a Time object
-  def day_next_week(datetime_obj)
+  def day_plus_offset(datetime_obj, days_offset)
     day_in_seconds = 24*60*60
-    week_in_seconds = 7*day_in_seconds
-    datetime_obj + week_in_seconds
+    datetime_obj + days_offset*day_in_seconds
   end
 
   def commit_command(commit_date)
@@ -287,8 +286,8 @@ class ContribMap
     commit_lines = []
     # puts '***Dates*****'
     # puts "Start date: #{start_date}"
-    image_map.each do |weekday_row|
-      commit_date = start_date
+    image_map.each_with_index do |weekday_row, index|
+      commit_date = day_plus_offset(start_date, index)
       weekday_row.each do |value|
         # puts "Value, commit_date: [#{value}, #{commit_date}]"
         if value > 0
@@ -298,7 +297,7 @@ class ContribMap
           end
           # puts 'Commits added!'
         end
-        commit_date = day_next_week(commit_date)
+        commit_date = day_plus_offset(commit_date, 7)  # Next week, same week day
         # puts "Next commit_date: [#{commit_date}]"
       end
     end
