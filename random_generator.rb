@@ -8,6 +8,7 @@ class Templater
               3 => 2,
               4 => 1
             }
+
   def initialize(weeks = 53, file_name = 'test.txt', name = 'random_example')
     weighted_array = WEIGHTS.collect{ |value, weight| [value.to_s]*weight }.flatten
     puts "Weighted array used: #{weighted_array}"

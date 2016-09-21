@@ -245,7 +245,8 @@ class ContribMap
     max_commits == 0 ? 1 : (max_commits / 4.0).ceil.to_i
   end
 
-  def random_contribution_map (weights = { 0 => 5, 1 => 4, 2 => 3, 3 => 2, 4 => 1 }, weeks = 53)
+  # 53 or 54 weeks?
+  def random_contribution_map (weights = { 0 => 5, 1 => 4, 2 => 3, 3 => 2, 4 => 1 }, weeks = 54)
     file_name = 'test.txt'
     name = 'random_example'
     weighted_array = weights.collect{ |value, weight| [value]*weight }.flatten
