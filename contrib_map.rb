@@ -228,8 +228,10 @@ class ContribMap
   def calendar_start_date
     right_now = Time.now
     one_year_ago = Time.new(right_now.year - 1, right_now.month, right_now.day, 12, 0, 0, right_now.utc_offset)
+    # One week less. It uses one year and 1 week:
+    day_in_seconds = 24*60*60
+    one_year_ago = one_year_ago - day_in_seconds * 7
     unless one_year_ago.sunday?
-      day_in_seconds = 24*60*60
       # Weekdays numbering in Ruby: Sunday #=> 0, Saturday #=> 6. So I need to get to the 7th day (zero again)
       weekday_delta = 7 - one_year_ago.wday
       one_year_ago = one_year_ago + day_in_seconds * weekday_delta
