@@ -41,7 +41,7 @@ class ContribMap
     defaults = { output_file: 'random.sh', map_file: 'random.txt' }
     questions = {
                   output_file: 'The output shell script',
-                  map_file:    'Map tet file to be generated'
+                  map_file:    'Map file to be generated'
                 }
     set_data(true, defaults.keys, defaults, questions, [], received_options)
     # Here I should have the instance variables:
@@ -49,14 +49,13 @@ class ContribMap
     #  @output_file, @map_file
 
     random_map = random_contribution_map
-    # puts 'random_contribution_map:'
-    # puts '*********'
-    # puts format_matrix_to_output(random_map)
-    # puts '*********'
+    puts 'random_contribution_map:'
+    puts '*********'
+    puts format_matrix_to_output(random_map)
+    puts '*********'
     
     save_contribution_map random_map, @map_file
-    # Pending to generate the script:
-    # Script contributions: the random_contribution_map times the faking multiplier (@faking_multiplier)
+
     random_map = map_multiply(random_map, @faking_multiplier)
     puts "random_contribution_map times @faking_multiplier(#{@faking_multiplier}):"
     puts '*********'
@@ -75,21 +74,60 @@ class ContribMap
 
     open(@output_file, 'w'){ |f| f << shell_script }
     puts "#{@output_file} saved."
-    puts "Create a new repo #{@github_url}#{@repo_to_change} and run the script"
+    puts "Create a repo called #{@github_url}#{@repo_to_change} and run the script"
   end
 
   def copy_user(received_options = {})
     defaults = { user_to_copy: 'tenderlove', output_file: 'tenderlove.sh' }
-    questions = {
-                  copy_user:   'Use the shape of the map of this user',
-                  output_file: 'The output shell script'
-                }
+    questions = { copy_user:   'Use the shape of the map of this user',
+                  output_file: 'The output shell script' }
     optionals = [ :map_file ]
     set_data(true, defaults.keys, defaults, questions, optionals, received_options)
     # Here I should have the instance variables:
     #  @github_url, @repo_to_change, @username
     #  @user_to_copy, @output_file
     #  And optional: @map_file
+
+    # TODO: Get the user_to_copy's contrib map:
+    the_map_to_copy = get_contributions_calendar(@user_to_copy)
+    puts "#{@user_to_copy}'s contribution map:"
+    puts '*********'
+    puts format_matrix_to_output(the_map_to_copy)
+    puts '*********'
+
+    copy_user_max_daily_commits = calendar_max_value the_map_to_copy
+    puts "The maximum number of daily commits of #{@copy_user} is: #{copy_user_max_daily_commits}"
+    puts "We will try to match #{@copy_user}'s repository map"
+
+    # Calendar for values 0..4, the contribution calendar to use only numbers 0..4
+    the_map_to_copy = normalize_calendar(the_map_to_copy)
+    puts "#{@user_to_copy}'s normalized map (values 0..4):"
+    puts '*********'
+    puts format_matrix_to_output(the_map_to_copy)
+    puts '*********'
+
+    save_contribution_map(the_map_to_copy, @map_file, @user_to_copy) if @map_file
+
+    the_map_to_copy = map_multiply(the_map_to_copy, @faking_multiplier)
+    puts "the_map_to_copy times @faking_multiplier(#{@faking_multiplier}):"
+    puts '*********'
+    puts format_matrix_to_output(the_map_to_copy)
+    puts '*********'
+
+    start_date = calendar_start_date
+    puts "start_date: [#{start_date}]"
+    shell_script = contribution_shell_script(the_map_to_copy, start_date, @username, @repo_to_change, 'git@github.com')
+
+    # puts '------'
+    # puts 'Script:'
+    # puts '*********'
+    # puts shell_script
+    # puts '*********'
+
+    open(@output_file, 'w'){ |f| f << shell_script }
+    puts "#{@output_file} saved."
+    puts "Create a repo called #{@github_url}#{@repo_to_change} and run the script"
+
   end
 
   private
@@ -266,6 +304,17 @@ class ContribMap
     random_matrix
   end
 
+  # Sets the contribution calendar to use only numbers 0..4
+  def normalize_calendar(contributions_calendar)
+    max_value = calendar_max_value(contributions_calendar)
+    scaling_value = scaling_multiplier(max_value.to_f).to_f
+    contributions_calendar.collect do |row|
+      row.collect do |n|
+        (n/scaling_value).ceil.to_i
+      end
+    end
+  end
+
   # Next date, given a Time object
   def day_plus_offset(datetime_obj, days_offset)
     day_in_seconds = 24*60*60
@@ -341,8 +390,12 @@ end
 #
 
 contrib_mapper = ContribMap.new(username: 'carloscd', repo_to_change: 'contrib_mapper')
+# puts '--RANDOM-------------------------------------------------------------------------'
+# contrib_mapper.random_map output_file: 'random.sh', map_file: 'random.txt'
+# puts '---------------------------------------------------------------------------------'
 
-contrib_mapper.random_map output_file: 'random.sh', map_file: 'random.txt'
+puts '--COPY USER----------------------------------------------------------------------'
+contrib_mapper.copy_user user_to_copy: 'tenderlove', output_file: 'tenderlove.sh', map_file: 'tenderlove.txt'
+puts '---------------------------------------------------------------------------------'
 
-# contrib_mapper.copy_user user_to_copy: 'tenderlove', output_file: 'tenderlove.sh', map_file: 'tenderlove.txt'
 # contrib_mapper.existing_map map_file: 'hello.txt', output_file: 'hello.sh'

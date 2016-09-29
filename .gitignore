@@ -1,6 +1,6 @@
 .DS_Store
 *.sh
 contrib_mapper/
-random.txt
+*.txt
 test.txt
 test_repo/
