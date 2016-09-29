@@ -390,9 +390,9 @@ end
 #
 
 contrib_mapper = ContribMap.new(username: 'carloscd', repo_to_change: 'contrib_mapper')
-# puts '--RANDOM-------------------------------------------------------------------------'
-# contrib_mapper.random_map output_file: 'random.sh', map_file: 'random.txt'
-# puts '---------------------------------------------------------------------------------'
+puts '--RANDOM-------------------------------------------------------------------------'
+contrib_mapper.random_map output_file: 'random.sh', map_file: 'random.txt'
+puts '---------------------------------------------------------------------------------'
 
 puts '--COPY USER----------------------------------------------------------------------'
 contrib_mapper.copy_user user_to_copy: 'tenderlove', output_file: 'tenderlove.sh', map_file: 'tenderlove.txt'
